@@ -11,6 +11,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
         resultImg = new QImage(path); // 结果二维数组
         selectImg = new QImage(originImg->size(), QImage::Format_ARGB32); // 选中情况Bool
+        vis = new QImage(originImg->size(), QImage::Format_ARGB32); // 广搜的时候用到
 
         img_w = originImg->width(); // 图片宽度
         img_h = originImg->height(); // 图片高度
@@ -174,15 +175,15 @@ void MainWindow::startChoose()
     movePointsToColors(); // 拖拽过的点转化成颜色+筛选点
 
     // 初始化 vis 数组
-    QImage vis(img_w, img_h, QImage::Format_ARGB32);
+    //QImage vis(img_w, img_h, QImage::Format_ARGB32);
     for (int i = 0; i < img_w; i++)
         for (int j = 0; j < img_h; j++)
-            vis.setPixel(i, j, qRgb(0,0,0));
+            vis->setPixel(i, j, qRgb(0,0,0));
 
     QPoint p;
     int x, y, count = 0;
     QColor cv;
-    QQueue<QPoint> q;
+    q.clear();
     // 初始化把鼠标拖拽过的点放到队列里
     for (int i =0; i < movePoints.size(); i++) {
         q.push_back(movePoints.at(i));
@@ -192,41 +193,28 @@ void MainWindow::startChoose()
         x = p.x();
         y = p.y();
         q.pop_front();
-        if (vis.pixelColor(x,y).red()!=0) continue;
-        vis.setPixel(x, y, qRgb(1,1,1));
+        if (vis->pixelColor(x,y).red()!=0) continue;
+        vis->setPixel(x, y, qRgb(1,1,1));
         cv = QColor(originImg->pixel(x, y));
         count++; // 遍历过的点数量
 
         resultImg->setPixel(x, y, qRgb(100,0,0));
         selectImg->setPixel(x, y, qRgb(1,1,1));
 
-        if (x > 0 && !isSelected(x-1, y) && vis.pixelColor(x-1,y).red()==0) {
-            if (isSame(QColor(originImg->pixel(x-1, y)))) {
-                q.push_back(QPoint(x-1,y));
-            }
-        }
-        if (x < img_w-1 && !isSelected(x+1, y) && vis.pixelColor(x+1,y).red()==0) {
-            if (isSame(QColor(originImg->pixel(x+1, y)))) {
-                q.push_back(QPoint(x+1,y));
-            }
-        }
-        if (y > 0 && !isSelected(x, y-1) && vis.pixelColor(x,y-1).red()==0) {
-            if (isSame(QColor(originImg->pixel(x, y-1)))) {
-                q.push_back(QPoint(x,y-1));
-            }
-        }
-        if (y < img_h-1 && !isSelected(x, y+1) && vis.pixelColor(x,y+1).red()==0) {
-            if (isSame(QColor(originImg->pixel(x, y+1)))) {
-                q.push_back(QPoint(x,y+1));
-            }
-        }
+        chooseNext(x-1, y, 0, -1, 0);
+        chooseNext(x+1, y, 0,  1, 0);
+        chooseNext(x, y-1, 0, 0, -1);
+        chooseNext(x, y+1, 0, 0,  1);
+        chooseNext(x-1, y-1, 0, -1, -1);
+        chooseNext(x-1, y+1, 0, -1, +1);
+        chooseNext(x+1, y-1, 0, +1, -1);
+        chooseNext(x+1, y+1, 0, +1, +1);
     }
 
     update();
     qDebug() << "choose finished, change count = " << count;
 
-
-    int hx, hy;
+    /*int hx, hy;
     bool find = false;
     for (int i = 0; i < img_h; i++)
     {
@@ -240,17 +228,33 @@ void MainWindow::startChoose()
         if (find)
             break;
     }
-    qDebug() << "hx:" << hx << "  hy:" << hy;
+    qDebug() << "toppest point : hx=" << hx << ", hy=" << hy;*/
 }
 
 /**
- * 选择下一个点
+ * 选择下一个点。
  * @param p 坐标
  * @param q 队列
  */
-void MainWindow::chooseNext(QPoint p, QQueue<QPoint>q)
+bool MainWindow::chooseNext(int x, int y, int d, int dx, int dy)
 {
-
+    if (d > 5) return false;
+    // 超过图片边界
+    if (x < 0 || x >= img_w || y < 0 || y >= img_h)
+        return false;
+    if (isSelected(x, y) || vis->pixelColor(x,y).red()!=0)
+        return false;
+    if (isSame(QColor(originImg->pixel(x, y))))
+    {
+        q.push_back(QPoint(x,y));
+        return true;
+    }
+    else if (chooseNext(x, y, (d+3), dx*(d+3), dy*(d+3)) || chooseNext(x, y, ++d, dx*d, dy*d) || chooseNext(x, y, ++d, dx*d, dy*d)
+        || chooseNext(x, y, ++d, dx*d, dy*d) || chooseNext(x, y, ++d, dx*d, dy*d)) // 向外扩张5个点
+    {
+        q.push_back(QPoint(x,y));
+    }
+    return false;
 }
 
 /**

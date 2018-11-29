@@ -41,7 +41,7 @@ protected:
     void movePointsToColors();
     void startChoose();
     void startUnChoose();
-    void chooseNext(QPoint p, QQueue<QPoint>q);
+    bool chooseNext(int x, int y, int d, int dx, int dy);
 
 private:
     int asb(int a, int b);
@@ -57,6 +57,9 @@ private:
     bool isChoosing;
     QList<QPoint>movePoints;
     QList<QColor>moveColors;
+
+    QQueue<QPoint> q;
+    QImage* vis;
 };
 
 #endif // MAINWINDOW_H
